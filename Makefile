@@ -1,6 +1,9 @@
 CFLAGS=-std=c11 -Wall -Wextra -Werror -pedantic -D_XOPEN_SOURCE
 
-all: info_user info_proc info_file
+all: info_user info_proc info_file client
+
+client : client.c
+
 
 pwd: info_user.o info_proc.o info_file.o
 

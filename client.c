@@ -6,12 +6,27 @@
 
 #define MAX_CHAR_USER 16
 #define MAX_SIZE_FILENAME 255
+t
 
 struct shm_reponse
 {
   int rdv;
   char reponse[2048];
 };
+
+
+struct queue {
+  struct question *head;
+  struct question *tail;
+
+};
+struct question {
+  struct question *next;
+  char *cmd;
+  char *arg;
+  struct shm_reponse reponse;
+};
+
 
 int main(int argc, char *argv[]) {
   int isUserUid, isUserName, isPid, isFile, opt;
@@ -42,8 +57,17 @@ int main(int argc, char *argv[]) {
           printf("BLALALALALALLALALLALALALALLALAAKLKLEWDHVKWXFJYKHYUGFUILKL\n");
           exit(EXIT_SUCCESS);
        default:
-          printf("Usage : ./client -x arg, for more information type ./client -h\n");
+          printf("Usage : ./client -? arg, for more information type ./client -h\n");
           exit(EXIT_FAILURE);
        }
    }
+   if(isUserUid + isUserName + isFile +isPid == 2) {
+      printf("Erreur, un seul argument possible\n");
+      exit(EXIT_FAILURE);
+   }
+
+
+
+
+
  }

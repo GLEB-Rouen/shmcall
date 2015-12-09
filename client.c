@@ -6,10 +6,8 @@
 
 #define MAX_CHAR_USER 16
 #define MAX_SIZE_FILENAME 255
-t
 
-struct shm_reponse
-{
+struct shm_reponse {
   int rdv;
   char reponse[2048];
 };

@@ -1,10 +1,13 @@
-CFLAGS=-std=c11 -Wall -Wextra -Werror -pedantic -D_XOPEN_SOURCE
+CFLAGS=-std=c11 -Wall -Wextra -Werror -pedantic -D_XOPEN_SOURCE=500
 
-all: info_user info_proc info_file serveur 
+LDLIBS = -lrt
+LDFLAGS = -pthread
 
-pwd: info_user.o info_proc.o info_file.o serveur.o
+all: info_user info_proc info_file serveur reponse
 
-pwd.o: info_user.c info_proc.c info_file.c serveur.c
+pwd: info_user.o info_proc.o info_file.o serveur.o reponse.o
+
+pwd.o: info_user.c info_proc.c info_file.c serveur.c reponse.c
 
 clean:
-	$(RM) *.o info_user info_proc info_file serveur s*~
+	$(RM) *.o info_user info_proc info_file serveur reponse s*~

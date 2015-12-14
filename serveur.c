@@ -83,10 +83,10 @@ void *run(struct question *quest) {
       if (shm_fd == -1) {
         perror("shm_open");
       }
-      /*if (shm_unlink(NOM_SHM) == -1) {
+      if (shm_unlink(NOM_SHM) == -1) {
         perror("shm_unlink");
         exit(EXIT_FAILURE);
-      }*/
+      }
       if (ftruncate(shm_fd, TAILLE_SHM) == -1) {
         perror("ftruncate");
         exit(EXIT_FAILURE);

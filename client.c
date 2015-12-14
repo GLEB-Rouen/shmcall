@@ -1,34 +1,49 @@
-#include <unistd.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <semaphore.h>
 #include <fcntl.h>
+#include <errno.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
 #include <string.h>
+#include <pthread.h>
+
 
 #define MAX_CHAR_USER 16
 #define MAX_SIZE_FILENAME 255
+#define NOM_SHM "File_question"
+
+
 
 struct shm_reponse {
-  int rdv;
-  char reponse[2048];
+  sem_t mutex;
+  sem_t vide;
+  sem_t plein;
+  char *reponse;
 };
 
-
 struct queue {
+  sem_t mutex;
+  sem_t vide;
+  sem_t plein;
   struct question *head;
   struct question *tail;
-
 };
 struct question {
   struct question *next;
   char *cmd;
   char *arg;
-  struct shm_reponse reponse;
+  char *nom_shm_rep; 
 };
 
+#define TAILLE_SHM_2 (sizeof(struct shm_reponse))
+#define TAILLE_SHM (sizeof(struct queue))
 
 int main(int argc, char *argv[]) {
   int isUserUid, isUserName, isPid, isFile, opt;
-  char userName[MAX_CHAR_USER], fileName[MAX_SIZE_FILENAME],uid[10], pid[10] ;
+  char arg[1024] ;
   isUserUid = 0;
   isUserName = 0;
   isPid = 0;
@@ -37,19 +52,19 @@ int main(int argc, char *argv[]) {
        switch (opt) {
        case 'u':
           isUserUid = 1;
-          strcpy(uid,optarg);
+          strcpy(arg,optarg);
           break;
        case 'n':
           isUserName = 1;
-          strcpy(userName,optarg);
+          strcpy(arg,optarg);
           break;
         case 'p':
           isPid = 1;
-          strcpy(pid,optarg);
+          strcpy(arg,optarg);
           break;
         case 'f':
           isFile = 1;
-          strcpy(fileName,optarg);
+          strcpy(arg,optarg);
           break;
         case 'h':
           printf("BLALALALALALLALALLALALALALLALAAKLKLEWDHVKWXFJYKHYUGFUILKL\n");
@@ -59,10 +74,86 @@ int main(int argc, char *argv[]) {
           exit(EXIT_FAILURE);
        }
    }
-   if(isUserUid + isUserName + isFile +isPid == 2) {
+   if(isUserUid + isUserName + isFile +isPid != 1) {
       printf("Erreur, un seul argument possible\n");
       exit(EXIT_FAILURE);
    }
+   
+  char * nomReponse = ""; // TODO : VERIFY AND CREATE MEMORY SEGMENT
+  sprintf(nomReponse, "%d", rand());
+
+
+
+
+
+
+
+  struct question *my_question = malloc(sizeof(struct question));
+  my_question->next = NULL;
+  char *laCmd;
+  if (isUserUid) {
+    laCmd = "info_user";
+  }
+  else if (isUserName) {
+    laCmd = "info_user";
+  }
+  else if (isPid) {
+    laCmd = "info_proc";
+  }
+  else {
+    laCmd = "info_file";
+  }
+  my_question->cmd = laCmd;
+  my_question->arg = arg;
+  my_question->nom_shm_rep = nomReponse;
+
+
+  int shm_fd = shm_open(NOM_SHM, O_RDWR , S_IRUSR | S_IWUSR);
+  if (shm_fd == -1) {
+    perror("shm_open");
+  }
+  struct queue *my_var;
+  if (ftruncate(shm_fd, sizeof(my_var)) == -1) {
+    perror("ftruncate");
+    exit(EXIT_FAILURE);
+  }
+  my_var = mmap(NULL, sizeof(my_var), PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+  if (my_var == MAP_FAILED) {
+    perror("mmap");
+    exit(EXIT_FAILURE);
+  }
+  if(my_var -> head == NULL) {
+    my_var -> head = my_question;
+  } else {
+    my_var -> tail -> next = my_question;
+  }
+  my_var -> tail = my_question;
+
+
+
+  sleep(10);
+shm_fd = shm_open(nomReponse, 
+      O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+  if (shm_fd == -1) {
+    perror("shm_open or error in random");
+  }
+
+  if (shm_unlink(NOM_SHM) == -1) {
+    perror("shm_unlink");
+    exit(EXIT_FAILURE);
+  }
+
+  if (ftruncate(shm_fd, TAILLE_SHM_2) == -1) {
+    perror("ftruncate");
+    exit(EXIT_FAILURE);
+  }
+  char *shm_ptr = mmap(NULL,  TAILLE_SHM_2, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+  if (shm_ptr == MAP_FAILED) {
+    perror("mmap");
+    exit(EXIT_FAILURE);
+  }
+  struct shm_reponse *maReponse = (struct shm_reponse*) shm_ptr;
+  printf("%s\n", maReponse -> reponse );
 
 
 

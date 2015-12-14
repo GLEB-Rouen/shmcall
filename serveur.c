@@ -161,7 +161,7 @@ int main(void) {
   }
       
   pthread_t th;
-  while (my_var -> head != NULL) {
+  while (1) {
     if (sem_wait(&my_var->plein) == -1) {
       perror("sem_wait");
       exit(EXIT_FAILURE);

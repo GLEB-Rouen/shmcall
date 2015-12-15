@@ -25,11 +25,13 @@ struct shm_reponse {
 };
 
 struct queue {
+  char *test;
   sem_t mutex;
   sem_t vide;
   sem_t plein;
   struct question *head;
   struct question *tail;
+  
 };
 struct question {
   struct question *next;
@@ -81,7 +83,7 @@ int main(int argc, char *argv[]) {
    }
    
   static char nomReponse[2048];
-  sprintf(nomReponse, "%d", rand());
+  sprintf(nomReponse, "/%d", rand());
 
 
 
@@ -110,25 +112,27 @@ int main(int argc, char *argv[]) {
   int shm_fd = shm_open(NOM_SHM, O_RDWR , S_IRUSR | S_IWUSR);
   if (shm_fd == -1) {
     perror("shm_open");
+    exit(EXIT_FAILURE);
   }
-  struct queue *my_var;
-  if (ftruncate(shm_fd, sizeof(my_var)) == -1) {
+  if (ftruncate(shm_fd, TAILLE_SHM) == -1) {
     perror("ftruncate");
     exit(EXIT_FAILURE);
   }
-  my_var = mmap(NULL, sizeof(my_var), PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
-  if (my_var == MAP_FAILED) {
+  char *shm_ptr = mmap(NULL, TAILLE_SHM, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+  if (shm_ptr == MAP_FAILED) {
     perror("mmap");
     exit(EXIT_FAILURE);
   }
-  /*if (sem_wait(&my_var->vide) == -1) {
+  struct queue *my_var = (struct queue *) shm_ptr;
+  printf("%s\n", my_var -> test); 
+  if (sem_wait(&my_var->vide) == -1) {
     perror("sem_wait");
     exit(EXIT_FAILURE);
   }
   if (sem_wait(&my_var->mutex) == -1) {
     perror("sem_wait");
     exit(EXIT_FAILURE);
-  }*/
+  }
   if(my_var -> head == NULL) {
     my_var -> head = my_question;
   } else {
@@ -136,43 +140,39 @@ int main(int argc, char *argv[]) {
   }
   my_var -> tail = my_question;
 
-  /*if (sem_post(&my_var->mutex) == -1) {
+  if (sem_post(&my_var->mutex) == -1) {
       perror("sem_post");
       exit(EXIT_FAILURE);
   }
   if (sem_post(&my_var->plein) == -1) {
     perror("sem_post");
     exit(EXIT_FAILURE);
-  }*/
+  }
 
   sleep(3);
   shm_fd = shm_open(nomReponse, 
       O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
   if (shm_fd == -1) {
     perror("shm_open or error in random");
-  }
-
-  if (shm_unlink(NOM_SHM) == -1) {
-    perror("shm_unlink");
     exit(EXIT_FAILURE);
   }
+
+  /*if (shm_unlink(nomReponse) == -1) {
+    perror("shm_unlink");
+    exit(EXIT_FAILURE);
+  }*/
 
   if (ftruncate(shm_fd, TAILLE_SHM_2) == -1) {
     perror("ftruncate");
     exit(EXIT_FAILURE);
   }
-  printf("a\n");
-  char *shm_ptr = mmap(NULL,  TAILLE_SHM_2, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+  shm_ptr = mmap(NULL,  TAILLE_SHM_2, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
   if (shm_ptr == MAP_FAILED) {
     perror("mmap");
     exit(EXIT_FAILURE);
   }
-  
   struct shm_reponse *maReponse = (struct shm_reponse*) shm_ptr;
+  printf("a\n");
   printf("%s\n", maReponse -> reponse );
-
-
-
-
-
+  printf("b\n");
  }

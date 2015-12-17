@@ -9,41 +9,37 @@
 #include <sys/wait.h>
 #include <string.h>
 #include <pthread.h>
+#include <time.h>
 
-
+#define N 30
 #define MAX_CHAR_USER 16
 #define MAX_SIZE_FILENAME 255
 #define NOM_SHM "/File_question"
 
 
-
 struct shm_reponse {
-  sem_t mutex;
-  sem_t vide;
-  sem_t plein;
-  char *reponse;
+  sem_t sem_p;
+  char reponse[2048];
 };
 
-struct queue {
-  char *test;
+struct file {
   sem_t mutex;
   sem_t vide;
   sem_t plein;
-  struct question *head;
-  struct question *tail;
+  int tete;      // Position d'ajout dans le tampon
+  int queue;     // Position de suppression dans le tampon
+   char buffer[][50]; // Le tampon contenant les données
   
 };
-struct question {
-  struct question *next;
-  char *cmd;
-  char *arg;
-  char *nom_shm_rep; 
-};
+
+#define TAILLE_SHM (sizeof(struct file) + (N * 50))
+
 
 #define TAILLE_SHM_2 (sizeof(struct shm_reponse))
-#define TAILLE_SHM (sizeof(struct queue))
+
 
 int main(int argc, char *argv[]) {
+  srand(time(NULL));
   int isUserUid, isUserName, isPid, isFile, opt;
   char arg[1024] ;
   isUserUid = 0;
@@ -85,31 +81,25 @@ int main(int argc, char *argv[]) {
   static char nomReponse[2048];
   sprintf(nomReponse, "/%d", rand());
 
-
-
-
-
-
-  struct question *my_question = malloc(sizeof(struct question));
-  my_question->next = NULL;
-  char *laCmd;
+  static char laQuest[2048];
   if (isUserUid) {
-    laCmd = "info_user";
+    strcpy(laQuest, "info_user");
   }
   else if (isUserName) {
-    laCmd = "info_user";
+    strcpy(laQuest, "info_user");
   }
   else if (isPid) {
-    laCmd = "info_proc";
+    strcpy(laQuest, "info_proc");
   }
   else {
-    laCmd = "info_file";
+    strcpy(laQuest, "info_file");
   }
-  my_question->cmd = laCmd;
-  my_question->arg = arg;
-  my_question->nom_shm_rep = nomReponse;
+  strcat(laQuest, ":");
+  strcat(laQuest, arg);
+  strcat(laQuest, ":");
+  strcat(laQuest, nomReponse);
 
-  int shm_fd = shm_open(NOM_SHM, O_RDWR , S_IRUSR | S_IWUSR);
+  int shm_fd = shm_open(NOM_SHM, O_RDWR, S_IRUSR | S_IWUSR);
   if (shm_fd == -1) {
     perror("shm_open");
     exit(EXIT_FAILURE);
@@ -118,38 +108,29 @@ int main(int argc, char *argv[]) {
     perror("ftruncate");
     exit(EXIT_FAILURE);
   }
-  char *shm_ptr = mmap(NULL, TAILLE_SHM, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+  struct file *shm_ptr = mmap(NULL, TAILLE_SHM, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
   if (shm_ptr == MAP_FAILED) {
     perror("mmap");
     exit(EXIT_FAILURE);
   }
-  struct queue *my_var = (struct queue *) shm_ptr;
-  printf("%s\n", my_var -> test); 
-  if (sem_wait(&my_var->vide) == -1) {
+  if (sem_wait(&shm_ptr->vide) == -1) {
     perror("sem_wait");
     exit(EXIT_FAILURE);
   }
-  if (sem_wait(&my_var->mutex) == -1) {
+  if (sem_wait(&shm_ptr->mutex) == -1) {
     perror("sem_wait");
     exit(EXIT_FAILURE);
   }
-  if(my_var -> head == NULL) {
-    my_var -> head = my_question;
-  } else {
-    my_var -> tail -> next = my_question;
-  }
-  my_var -> tail = my_question;
-
-  if (sem_post(&my_var->mutex) == -1) {
+  strcpy(shm_ptr->buffer[shm_ptr->queue], laQuest);
+  shm_ptr->queue = (shm_ptr->queue + 1) % N; 
+  if (sem_post(&shm_ptr->mutex) == -1) {
       perror("sem_post");
       exit(EXIT_FAILURE);
   }
-  if (sem_post(&my_var->plein) == -1) {
+  if (sem_post(&shm_ptr->plein) == -1) {
     perror("sem_post");
     exit(EXIT_FAILURE);
   }
-
-  sleep(3);
   shm_fd = shm_open(nomReponse, 
       O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
   if (shm_fd == -1) {
@@ -157,22 +138,26 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
 
-  /*if (shm_unlink(nomReponse) == -1) {
-    perror("shm_unlink");
-    exit(EXIT_FAILURE);
-  }*/
-
   if (ftruncate(shm_fd, TAILLE_SHM_2) == -1) {
     perror("ftruncate");
     exit(EXIT_FAILURE);
   }
-  shm_ptr = mmap(NULL,  TAILLE_SHM_2, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+  struct shm_reponse *shm_ptr2 = mmap(NULL,  TAILLE_SHM_2, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
   if (shm_ptr == MAP_FAILED) {
     perror("mmap");
     exit(EXIT_FAILURE);
   }
-  struct shm_reponse *maReponse = (struct shm_reponse*) shm_ptr;
-  printf("a\n");
-  printf("%s\n", maReponse -> reponse );
-  printf("b\n");
+  if (sem_init(&shm_ptr2 -> sem_p, 1, 0) == -1) {
+    perror("sem_init");
+    exit(EXIT_FAILURE);
+  }
+  if (sem_wait(&shm_ptr2 -> sem_p) == -1) {
+      perror("sem_wait");
+      exit(EXIT_FAILURE);
+    }
+  printf("%s", shm_ptr2 -> reponse );
+  if (shm_unlink(nomReponse) == -1) {
+    perror("shm_unlink");
+    exit(EXIT_FAILURE);
+  }
  }
